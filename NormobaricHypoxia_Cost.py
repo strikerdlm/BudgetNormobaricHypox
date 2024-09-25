@@ -58,8 +58,6 @@ def get_positive_int(prompt, default_value=None):
         except ValueError:
             print("Invalid input. Please enter an integer or press Enter to keep the default.")
 
-# [Previous code sections remain unchanged]
-
 def calculate_physiological_parameters(altitude_ft, duration_minutes):
     """
     Calculate physiological parameters for an average adult at a given altitude and duration.
@@ -117,9 +115,6 @@ def calculate_physiological_parameters(altitude_ft, duration_minutes):
         "heart_rate_bpm": heart_rate,
         "duration_minutes": duration_minutes
     }
-
-# [Rest of the code remains unchanged]
-
 
 def calculate_gas_consumption(
     students_per_week,
