@@ -57,7 +57,7 @@ This tool is ideal for aviation training centers, sports facilities, or any orga
 Run the script using Python:
 
 ```bash
-python GasCalc_updated.py
+python NormobaricHypoxia_Cost.py
 ```
 
 Follow the interactive menu to perform desired calculations. The program allows you to:
