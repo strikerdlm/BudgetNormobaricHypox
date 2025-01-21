@@ -9,16 +9,34 @@ gases for a normobaric hypoxia training program based on user inputs.
 It also calculates physiological parameters for an average adult at different altitudes.
 
 Author: Diego Malpica
-Date: 04-10-2024
+Date: 21-01-2025
 
 Assumptions:
 - The primary gas used is compressed air from the air tank (21% O₂, 78% N₂).
 - Nitrogen is added to the compressed air to simulate altitude (hypoxic conditions).
 - 100% Oxygen is provided during the recovery phase.
 - Physiological responses are based on average adult data and standard physiological models.
+- Standard gas cylinder sizes: Type T (50L), Type K (45L), Type G (50L) at 200 bar pressure.
 """
 
 import sys
+
+# Default values for all calculations
+DEFAULTS = {
+    "students_per_week": 20,
+    "weeks": 26,
+    "session_duration_minutes": 20,
+    "recovery_duration_minutes": 5,
+    "price_air": 17853,
+    "price_nitrogen": 17838,
+    "price_oxygen": 19654,
+    "contingency_percentage": 0.10,
+    "altitude_ft": 25000,
+    # Standard gas cylinder volumes (m3) at 200 bar
+    "air_cylinder_volume": 10,  # Type T (50L)
+    "nitrogen_cylinder_volume": 9,  # Type K (45L)
+    "oxygen_cylinder_volume": 10,  # Type G (50L)
+}
 
 def get_user_input(prompt: str, default_value=None, value_type=float):
     """
@@ -144,64 +162,213 @@ def calculate_gas_consumption(sessions_per_week: int, weeks: int, session_durati
         "total_cost_with_contingency_COP": total_cost_with_contingency
     }
 
-def main():
+def calculate_student_capacity(air_cylinder_volume: float, nitrogen_cylinder_volume: float, oxygen_cylinder_volume: float, 
+                            session_duration_minutes: float, ventilation_rate: float, recovery_duration_minutes: float) -> dict:
     """
-    Main function to execute the Budget Calculator.
+    Calculate how many students can be trained with given gas cylinder volumes.
+    
+    Parameters:
+    - air_cylinder_volume: Volume of compressed air cylinder in m3
+    - nitrogen_cylinder_volume: Volume of nitrogen cylinder in m3
+    - oxygen_cylinder_volume: Volume of oxygen cylinder in m3
+    - session_duration_minutes: Duration of each session in minutes
+    - ventilation_rate: Ventilation rate in L/min
+    - recovery_duration_minutes: Duration of recovery in minutes
+    
+    Returns:
+    - Dictionary with capacity details
     """
-    print("=== Normobaric Hypoxia Training Budget Calculator ===\n")
-
-    # Default values
-    DEFAULTS = {
-        "students_per_week": 20,
-        "weeks": 26,
-        "session_duration_minutes": 20,
-        "recovery_duration_minutes": 5,
-        "price_air": 17853,
-        "price_nitrogen": 17838,
-        "price_oxygen": 19654,
-        "contingency_percentage": 0.10,
-        "altitude_ft": 25000
+    # Calculate consumption per student session
+    air_per_session = (ventilation_rate * session_duration_minutes) / 1000  # m3
+    nitrogen_per_session = air_per_session * 0.05  # m3
+    oxygen_per_session = (ventilation_rate * recovery_duration_minutes) / 1000  # m3
+    
+    # Calculate maximum students for each gas type
+    max_students_air = int(air_cylinder_volume / air_per_session)
+    max_students_nitrogen = int(nitrogen_cylinder_volume / nitrogen_per_session)
+    max_students_oxygen = int(oxygen_cylinder_volume / oxygen_per_session)
+    
+    # The limiting factor will be the minimum of all three
+    max_students = min(max_students_air, max_students_nitrogen, max_students_oxygen)
+    
+    return {
+        "max_students_total": max_students,
+        "max_students_air": max_students_air,
+        "max_students_nitrogen": max_students_nitrogen,
+        "max_students_oxygen": max_students_oxygen,
+        "air_per_session_m3": air_per_session,
+        "nitrogen_per_session_m3": nitrogen_per_session,
+        "oxygen_per_session_m3": oxygen_per_session
     }
 
-    # User inputs
-    students_per_week = get_user_input(f"Enter the number of students per week (default is {DEFAULTS['students_per_week']}): ", DEFAULTS['students_per_week'], int)
-    weeks = get_user_input(f"Enter the number of weeks for the training program (default is {DEFAULTS['weeks']}): ", DEFAULTS['weeks'], int)
-    session_duration_minutes = get_user_input(f"Enter the duration of each session in minutes (default is {DEFAULTS['session_duration_minutes']}): ", DEFAULTS['session_duration_minutes'])
-    recovery_duration_minutes = get_user_input(f"Enter the recovery duration in minutes (default is {DEFAULTS['recovery_duration_minutes']}): ", DEFAULTS['recovery_duration_minutes'])
-    altitude_ft = get_user_input(f"Enter the simulated altitude in feet (default is {DEFAULTS['altitude_ft']} ft): ", DEFAULTS['altitude_ft'])
+def display_menu():
+    """
+    Display the main menu options.
+    """
+    print("\n=== Normobaric Hypoxia Training Calculator Menu ===")
+    print("1. Calculate Physiological Parameters")
+    print("2. Calculate Gas Consumption and Costs")
+    print("3. Calculate Training Capacity from Cylinder Volumes")
+    print("4. Run All Calculations")
+    print("5. Exit")
+    print("===============================================")
 
-    # Calculate physiological parameters
-    physio_params = calculate_physiological_parameters(altitude_ft)
-    ventilation_rate = physio_params['ventilation_rate_L_per_min']
-
-    # Additional user inputs
-    price_air = get_user_input(f"Enter the price of Compressed Air per m3 in COP (default is {DEFAULTS['price_air']}): ", DEFAULTS['price_air'])
-    price_nitrogen = get_user_input(f"Enter the price of Nitrogen per m3 in COP (default is {DEFAULTS['price_nitrogen']}): ", DEFAULTS['price_nitrogen'])
-    price_oxygen = get_user_input(f"Enter the price of Oxygen per m3 in COP (default is {DEFAULTS['price_oxygen']}): ", DEFAULTS['price_oxygen'])
-    contingency_percentage = get_user_input(f"Enter the contingency percentage as a decimal (default is {DEFAULTS['contingency_percentage']}): ", DEFAULTS['contingency_percentage'])
-
-    # Calculate gas consumption and costs
-    results = calculate_gas_consumption(
-        students_per_week, weeks, session_duration_minutes, ventilation_rate,
-        recovery_duration_minutes, price_air, price_nitrogen, price_oxygen, contingency_percentage
+def get_basic_inputs() -> dict:
+    """
+    Get the basic inputs needed for most calculations.
+    """
+    inputs = {}
+    inputs["session_duration_minutes"] = get_user_input(
+        f"Enter the duration of each session in minutes (default is {DEFAULTS['session_duration_minutes']}): ", 
+        DEFAULTS['session_duration_minutes']
     )
+    inputs["recovery_duration_minutes"] = get_user_input(
+        f"Enter the recovery duration in minutes (default is {DEFAULTS['recovery_duration_minutes']}): ", 
+        DEFAULTS['recovery_duration_minutes']
+    )
+    inputs["altitude_ft"] = get_user_input(
+        f"Enter the simulated altitude in feet (default is {DEFAULTS['altitude_ft']} ft): ", 
+        DEFAULTS['altitude_ft']
+    )
+    return inputs
 
-    # Display results
+def run_physiological_calculation():
+    """
+    Run only the physiological parameters calculation.
+    """
+    inputs = get_basic_inputs()
+    physio_params = calculate_physiological_parameters(inputs["altitude_ft"])
+    
     print("\n=== Physiological Parameters ===\n")
     for key, value in physio_params.items():
         if isinstance(value, float):
             print(f"{key.replace('_', ' ').title()}: {value:.2f}")
         else:
             print(f"{key.replace('_', ' ').title()}: {value}")
+    return physio_params
 
+def run_consumption_calculation():
+    """
+    Run only the gas consumption and cost calculation.
+    """
+    inputs = get_basic_inputs()
+    students_per_week = get_user_input(
+        f"Enter the number of students per week (default is {DEFAULTS['students_per_week']}): ", 
+        DEFAULTS['students_per_week'], 
+        int
+    )
+    weeks = get_user_input(
+        f"Enter the number of weeks for the training program (default is {DEFAULTS['weeks']}): ", 
+        DEFAULTS['weeks'], 
+        int
+    )
+    
+    # Get gas prices
+    price_air = get_user_input(
+        f"Enter the price of Compressed Air per m3 in COP (default is {DEFAULTS['price_air']}): ", 
+        DEFAULTS['price_air']
+    )
+    price_nitrogen = get_user_input(
+        f"Enter the price of Nitrogen per m3 in COP (default is {DEFAULTS['price_nitrogen']}): ", 
+        DEFAULTS['price_nitrogen']
+    )
+    price_oxygen = get_user_input(
+        f"Enter the price of Oxygen per m3 in COP (default is {DEFAULTS['price_oxygen']}): ", 
+        DEFAULTS['price_oxygen']
+    )
+    contingency_percentage = get_user_input(
+        f"Enter the contingency percentage as a decimal (default is {DEFAULTS['contingency_percentage']}): ", 
+        DEFAULTS['contingency_percentage']
+    )
+    
+    physio_params = calculate_physiological_parameters(inputs["altitude_ft"])
+    ventilation_rate = physio_params['ventilation_rate_L_per_min']
+    
+    results = calculate_gas_consumption(
+        students_per_week, weeks, inputs["session_duration_minutes"], ventilation_rate,
+        inputs["recovery_duration_minutes"], price_air, price_nitrogen, price_oxygen, contingency_percentage
+    )
+    
     print("\n=== Budget Summary ===\n")
     for key, value in results.items():
         if isinstance(value, float):
             print(f"{key.replace('_', ' ').title()}: {value:.2f}")
         else:
             print(f"{key.replace('_', ' ').title()}: {value}")
+    return results
 
-    print("\n=== End of Calculation ===")
+def run_capacity_calculation():
+    """
+    Run only the cylinder capacity calculation.
+    """
+    inputs = get_basic_inputs()
+    print("\n=== Gas Cylinder Configuration ===")
+    print("Standard cylinder sizes: Type T (50L), Type K (45L), Type G (50L) at 200 bar pressure")
+    
+    air_cylinder_volume = get_user_input(
+        f"Enter the Compressed Air cylinder volume in m3 (default is {DEFAULTS['air_cylinder_volume']}): ", 
+        DEFAULTS['air_cylinder_volume']
+    )
+    nitrogen_cylinder_volume = get_user_input(
+        f"Enter the Nitrogen cylinder volume in m3 (default is {DEFAULTS['nitrogen_cylinder_volume']}): ", 
+        DEFAULTS['nitrogen_cylinder_volume']
+    )
+    oxygen_cylinder_volume = get_user_input(
+        f"Enter the Oxygen cylinder volume in m3 (default is {DEFAULTS['oxygen_cylinder_volume']}): ", 
+        DEFAULTS['oxygen_cylinder_volume']
+    )
+    
+    physio_params = calculate_physiological_parameters(inputs["altitude_ft"])
+    ventilation_rate = physio_params['ventilation_rate_L_per_min']
+    
+    capacity_results = calculate_student_capacity(
+        air_cylinder_volume, nitrogen_cylinder_volume, oxygen_cylinder_volume,
+        inputs["session_duration_minutes"], ventilation_rate, inputs["recovery_duration_minutes"]
+    )
+    
+    print("\n=== Cylinder Capacity Analysis ===\n")
+    for key, value in capacity_results.items():
+        if isinstance(value, float):
+            print(f"{key.replace('_', ' ').title()}: {value:.2f}")
+        else:
+            print(f"{key.replace('_', ' ').title()}: {value}")
+    return capacity_results
+
+def run_all_calculations():
+    """
+    Run all calculations in sequence.
+    """
+    physio_params = run_physiological_calculation()
+    consumption_results = run_consumption_calculation()
+    capacity_results = run_capacity_calculation()
+    return physio_params, consumption_results, capacity_results
+
+def main():
+    """
+    Main function to execute the Budget Calculator with menu system.
+    """
+    print("=== Normobaric Hypoxia Training Budget Calculator ===")
+    print("= by Diego Malpica =\n")
+    
+    while True:
+        display_menu()
+        choice = get_user_input("Enter your choice (1-5): ", 1, int)
+        
+        if choice == 1:
+            run_physiological_calculation()
+        elif choice == 2:
+            run_consumption_calculation()
+        elif choice == 3:
+            run_capacity_calculation()
+        elif choice == 4:
+            run_all_calculations()
+        elif choice == 5:
+            print("\nThank you for using the calculator. Goodbye!")
+            sys.exit(0)
+        else:
+            print("\nInvalid choice. Please select a number between 1 and 5.")
+        
+        input("\nPress Enter to continue...")
 
 if __name__ == "__main__":
     try:
